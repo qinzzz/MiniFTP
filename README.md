@@ -1,7 +1,9 @@
 # MiniFTP
-Project for IS301 Computer Communication and Network -- Ftp server and client 
+Project for IS301 Computer Communication and Network -- Ftp server and client in python 
+
 ⛑ still under construction
-🚩 estimated date of completion: 12.15 
+
+🚩 estimated time of completion: 12.15 
 
 Use FTP commands standardized in [RFC 959](https://tools.ietf.org/html/rfc95) by the IETF. 
 
