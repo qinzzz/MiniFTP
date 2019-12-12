@@ -5,7 +5,7 @@ import time
 import socket
 import subprocess
 import threading
-from utils import removeDir
+from utils import removeDir, FtpFile
 
 try:
     HOST = socket.gethostbyname(socket.gethostname( ))
@@ -26,7 +26,7 @@ class MiniFTP(threading.Thread):
         self.passive_on = False
         self.mode = 'I'
         self.sendCmd('220 ---- Welcome to Portal of MiniFTP ---- \r\n')
-        
+        self.auth = 0
 
         
     def run(self):
@@ -35,12 +35,12 @@ class MiniFTP(threading.Thread):
                 data = self.conn.recv(BUFSIZE).rstrip()
                 try:
                     cmd = data.decode('utf-8')
-                except AttributeError:
+                except:
                     cmd = data
                 self.log('Receive', cmd)
                 
             except socket.error as err:
-                self.log('Receive error', err)
+                self.log('Receive error1', err)
 
             try:
                 if not cmd:
@@ -57,7 +57,7 @@ class MiniFTP(threading.Thread):
                         self.log(command, 'Unknown command.')
             except AttributeError as err:
                 self.sendCmd('500 Syntax error, command unrecognized.\r\n')
-                self.log('Receive', err)
+                self.log('Receive error2', err)
   
 
     def USER(self, user):
@@ -81,8 +81,8 @@ class MiniFTP(threading.Thread):
         else:
             # self.sendCmd('230 User logged in, proceed.\r\n')
             self.passwd = passwd
-            self.authenticated = self.loginAuth()
-            if not self.authenticated:
+            login = self.loginAuth()
+            if not login:
                 self.conn.close()
             # else:
             #     self.PASV()
@@ -98,7 +98,7 @@ class MiniFTP(threading.Thread):
     def loginAuth(self):
         f = open('auth.config', 'r')
         for line in f.readlines():
-            user, pswd = line.split()
+            user, pswd, self.auth = line.split()
             if user == self.username and pswd == self.passwd:
                 self.log("Login", "success")
                 self.sendCmd("230 User logged in as %s \r\n" %(user))
@@ -186,7 +186,7 @@ class MiniFTP(threading.Thread):
             serverPath = LOCALDIR
         else:
             serverPath = os.path.join(self.cwd, path)
-        serverPath = os.path.abspath(serverPath)
+        # serverPath = os.path.abspath(serverPath)
         print(serverPath)
         if serverPath and os.path.exists(serverPath):
             if os.path.commonprefix([LOCALDIR, serverPath]) == LOCALDIR:
@@ -198,6 +198,33 @@ class MiniFTP(threading.Thread):
             self.sendCmd('550 Directory not exists.\r\n')
             return
 
+    def NLST(self, path):
+        self.log('NLST',path)
+        if not path:
+            serverPath = self.cwd
+        else:
+            serverPath = os.path.join(self.cwd, path)
+
+        # serverPath = os.path.join(LOCALDIR, curpath)
+        print(serverPath)
+        if not os.path.exists(serverPath):
+            self.sendCmd('550 Path name not exists.\r\n')
+            return
+        self.sendCmd('150 File list: \r\n')
+        self.openDataSock()
+        if os.path.isdir(serverPath):       #   TODO: add detailed file information
+            for file in os.listdir(serverPath):
+                try:
+                    self.sendData(file+'\r\n') 
+                except Exception as e:
+                    self.log('LIST error', e)
+        elif os.path.isfile(serverPath):
+            try:
+                self.sendData(file+'\r\n')
+            except Exception as e:
+                    self.log('LIST error', e)
+        self.closeDataSock()
+        self.sendCmd('226 Transfer complete.\r\n')
 
     def LIST(self, path):
         self.log('LIST',path)
@@ -211,22 +238,26 @@ class MiniFTP(threading.Thread):
         if not os.path.exists(serverPath):
             self.sendCmd('550 Path name not exists.\r\n')
             return
-        self.sendCmd('150 Here is listing --- \r\n')
+        self.sendCmd('150 File list: \r\n')
         self.openDataSock()
         if os.path.isdir(serverPath):       #   TODO: add detailed file information
             for file in os.listdir(serverPath):
                 try:
-                    self.sendData('- '+file+'\r\n') 
+                    cfile = FtpFile(os.path.join(serverPath, file))
+                    fileinfo = cfile.listFormat()
+                    self.sendData(fileinfo+'\r\n') 
                 except Exception as e:
                     self.log('LIST error', e)
         elif os.path.isfile(serverPath):
-            name = os.path.basename(serverPath)
+            # name = os.path.basename(serverPath)
+            cfile = FtpFile(serverPath)
+            fileinfo = cfile.listFormat()
             try:
-                self.sendData(name+'\r\n')
+                self.sendData(fileinfo+'\r\n')
             except Exception as e:
                     self.log('LIST error', e)
         self.closeDataSock()
-        self.sendCmd('226 List done.\r\n')
+        self.sendCmd('226 Transfer complete.\r\n')
         # self.closeDataSock()
     
     def MKD(self, name):
@@ -289,10 +320,11 @@ class MiniFTP(threading.Thread):
         if not os.path.exists(pathname):
             return
         try:
-            if self.mode=='I':
-                file = open(pathname, 'rb')
-            else:
-                file = open(pathname, 'r')
+            # if self.mode=='I':
+            #     file = open(pathname, 'rb')
+            # else:
+            #     file = open(pathname, 'r')
+            file = open(pathname, 'r')
         except OSError as err:
             self.log('RETR', err)
 
@@ -301,11 +333,22 @@ class MiniFTP(threading.Thread):
         self.openDataSock( )
         while True:
             data = file.read(BUFSIZE)
-            if not data: break
+            if not data: 
+                break
             self.sendData(data)
         file.close()
         self.closeDataSock( )
         self.sendCmd('226 Transfer complete.\r\n')
+
+    def RMD(self, dirname):
+        dirpath = os.path.join(self.cwd, dirname)
+        self.log('RMD', dirpath)
+        if not os.path.exists(dirpath):
+            self.sendCmd('550 Directory %s not exists.\r\n' % dirpath)
+        else:
+            removeDir(dirpath)
+        self.sendCmd('250 Directory deleted. \r\n')
+
 
 def connect():
         ip_port = (HOST, PORT)
