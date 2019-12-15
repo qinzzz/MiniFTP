@@ -34,12 +34,12 @@ Use FTP commands standardized in [RFC 959](https://tools.ietf.org/html/rfc95) by
 
                       Figure 1  Model for FTP Use
 
-
 ## DONE
 - Listen on a given port (default 21)
 - Connect to ftp client
 - User login
 - PASV: Passive mode
+- POST: Active mode
 - PWD: Print working directory. Returns the current directory of the host.
 - CWD: Change working directory.
 - DELE: Delete file.
@@ -47,13 +47,14 @@ Use FTP commands standardized in [RFC 959](https://tools.ietf.org/html/rfc95) by
 - LIST: Returns information of a file or directory if specified, else information of the current working directory is returned.
 - STOR: Accept the data and to store the data as a file at the server site
 - RETR: Retrieve a remote file
+- NLST: name list of remote directory
+- RNFR: 
+- RNTO: 
+- Authority control for different users
 
 ## TODO
-- NLST: name list of remote directory
-- RMFR
-- RMTO
-- POST 主动模式
-- Authority control for different users
+- debug: ASCII and Binary mode
+- debug: non-local connection
 
 
 

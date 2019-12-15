@@ -58,6 +58,7 @@ class MiniFTP(threading.Thread):
             except AttributeError as err:
                 self.sendCmd('500 Syntax error, command unrecognized.\r\n')
                 self.log('Receive error2', err)
+                return
   
 
     def USER(self, user):
@@ -92,13 +93,14 @@ class MiniFTP(threading.Thread):
     '''
         Check login authority. 
         Save user information in 'auth.config' as 
-            username password \n
+            username password authority\n
 
     '''
     def loginAuth(self):
         f = open('auth.config', 'r')
         for line in f.readlines():
             user, pswd, self.auth = line.split()
+            self.auth = int(self.auth)
             if user == self.username and pswd == self.passwd:
                 self.log("Login", "success")
                 self.sendCmd("230 User logged in as %s \r\n" %(user))
@@ -133,9 +135,18 @@ class MiniFTP(threading.Thread):
             ip_port = ip+','+str(port1)+','+str(port2)
             self.log('PASV','%s.'%ip_port)
             self.sendCmd('227 Entering Passive Mode (%s).\r\n'%ip_port)
-            
 
-        # def NOOP(self):
+
+    def PORT(self, cmd):
+        self.log("PORT", cmd)
+        if self.passive_on:
+            self.socket_data.close()
+            self.passive_on=False
+        data = cmd.split(',')
+        self.dataIp = '.'.join(data[:4])
+        self.dataPort = int(data[4])*256+int(data[5])
+        self.sendCmd('200 Get port.\r\n')
+        
 
     
     '''
@@ -152,14 +163,20 @@ class MiniFTP(threading.Thread):
         self.log('Open data sock', '...')
         # only passive mode 
         # socket_data = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.dataConn, addr = self.socket_data.accept( )
+        if self.passive_on:
+            self.dataConn, addr = self.socket_data.accept( )
+        else:
+            self.dataConn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.dataConn.connect((self.dataIp, self.dataPort))
         self.log('Open data sock', 'done.')
         # self.sendCmd('Data sock opened on %s.\r\n'%str(self.dataConn))
 
     def closeDataSock(self):
         self.log('Stop data sock', self.dataConn)
         self.dataConn.close()
-        self.socket_data.close( )
+        if self.passive_on:
+            self.passive_on = False
+            self.socket_data.close( )
         self.log('Stop data sock', 'closed.')
         # self.sendCmd('Data sock closed on %s.\r\n'%str(self.dataConn))
 
@@ -280,6 +297,9 @@ class MiniFTP(threading.Thread):
 
 
     def DELE(self, filename):
+        if self.auth <= 2:
+            self.sendCmd('530 Delete failed : Permission denied.\r\n')
+        self.log("DELE", filename)
         filepath = os.path.join(self.cwd, filename)
         self.log('DELE', filepath)
         if not os.path.exists(filepath):
@@ -292,6 +312,7 @@ class MiniFTP(threading.Thread):
         
 
     def STOR(self, localpath):
+        self.log("STOR", localpath)
         filename = os.path.basename(localpath)
         filepath = os.path.join(self.cwd, filename)
         try:    
@@ -315,21 +336,24 @@ class MiniFTP(threading.Thread):
 
 
     def RETR(self, filename):
+        if self.auth <= 1:
+            self.sendCmd('530 Download failed : Permission denied.\r\n')
+            return
+        self.log("RETR", filename)
         pathname = os.path.join(self.cwd, filename)
         self.log('RETR', pathname)
         if not os.path.exists(pathname):
             return
         try:
-            # if self.mode=='I':
-            #     file = open(pathname, 'rb')
-            # else:
-            #     file = open(pathname, 'r')
-            file = open(pathname, 'r')
+            if self.mode=='I':
+                file = open(pathname, 'rb')
+            else:
+                file = open(pathname, 'r')
+            # file = open(pathname, 'r')
         except OSError as err:
             self.log('RETR', err)
 
         self.sendCmd('150 Opening data connection.\r\n')
-
         self.openDataSock( )
         while True:
             data = file.read(BUFSIZE)
@@ -340,7 +364,12 @@ class MiniFTP(threading.Thread):
         self.closeDataSock( )
         self.sendCmd('226 Transfer complete.\r\n')
 
+
     def RMD(self, dirname):
+        if self.auth <= 2:
+            self.sendCmd('530 Remove failed : Permission denied.\r\n')
+            return
+        self.log("RMD", dirname)
         dirpath = os.path.join(self.cwd, dirname)
         self.log('RMD', dirpath)
         if not os.path.exists(dirpath):
@@ -349,6 +378,24 @@ class MiniFTP(threading.Thread):
             removeDir(dirpath)
         self.sendCmd('250 Directory deleted. \r\n')
 
+
+    def RNFR(self, from_filename):
+        if self.auth <= 2:
+            self.sendCmd('530 Rename failed : Permission denied.\r\n')
+            return
+        self.log("RNFR", from_filename)
+        filepath = os.path.join(self.cwd, from_filename)
+        if not os.path.exists(filepath):
+            self.sendCmd('550 RNFR failed File or Directory %s not exists.\r\n' % filepath)
+        else:
+            self.from_filepath = filepath
+            self.sendCmd('350 Ready for rename to.\r\n')
+
+    def RNTO(self, to_filename):
+        self.log("RNTO", to_filename)
+        to_filepath = os.path.join(self.cwd, to_filename)
+        os.rename(self.from_filepath, to_filepath)
+        self.sendCmd('250 Rename done. \r\n')
 
 def connect():
         ip_port = (HOST, PORT)
