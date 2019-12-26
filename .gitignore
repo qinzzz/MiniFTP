@@ -1,3 +1,5 @@
 auth.config
 /__pycache__
 /.vscode
+ftp_client.py
+dialog.py

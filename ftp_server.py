@@ -6,6 +6,8 @@ import socket
 import subprocess
 import threading
 from utils import removeDir, FtpFile
+import argparse
+import hashlib
 
 try:
     HOST = socket.gethostbyname(socket.gethostname( ))
@@ -72,7 +74,7 @@ class MiniFTP(threading.Thread):
 
 
     def PASS(self, passwd): 
-        self.log("PASS", passwd) 
+        self.log("PASS", '*'*len(passwd)) 
         if not passwd:
             self.sendCmd('501 Syntax error in parameters or arguments.\r\n')
 
@@ -81,7 +83,9 @@ class MiniFTP(threading.Thread):
 
         else:
             # self.sendCmd('230 User logged in, proceed.\r\n')
-            self.passwd = passwd
+            m = hashlib.md5()
+            m.update(passwd.encode('utf-8'))
+            self.passwd = m.hexdigest()
             login = self.loginAuth()
             if not login:
                 self.conn.close()
@@ -101,7 +105,9 @@ class MiniFTP(threading.Thread):
         for line in f.readlines():
             user, pswd, self.auth = line.split()
             self.auth = int(self.auth)
-            if user == self.username and pswd == self.passwd:
+            mm = hashlib.md5()
+            mm.update(pswd.encode('utf-8'))
+            if user == self.username and mm.hexdigest() == self.passwd:
                 self.log("Login", "success")
                 self.sendCmd("230 User logged in as %s \r\n" %(user))
                 return True
@@ -183,7 +189,7 @@ class MiniFTP(threading.Thread):
     def sendData(self, cmd):
         self.dataConn.send(cmd.encode('utf-8'))
 
-
+    # print log to terminal
     def log(self, fun, cmd):
         date_time = time.strftime("[ %Y-%m-%d %H:%M:%S ] " + fun)
         print(date_time, ">>", cmd)
@@ -193,6 +199,10 @@ class MiniFTP(threading.Thread):
     '''
         FTP funtions
     '''
+    def SYST(self, arg):
+        self.log('SYS', arg)
+        self.sendCmd('215 %s type.\r\n' % sys.platform)
+
     def PWD(self, cmd):
         self.log('PWD', cmd)
         self.sendCmd('257 %s.\r\n'%self.cwd)
@@ -203,7 +213,7 @@ class MiniFTP(threading.Thread):
             serverPath = LOCALDIR
         else:
             serverPath = os.path.join(self.cwd, path)
-        # serverPath = os.path.abspath(serverPath)
+        serverPath = os.path.abspath(serverPath)
         print(serverPath)
         if serverPath and os.path.exists(serverPath):
             if os.path.commonprefix([LOCALDIR, serverPath]) == LOCALDIR:
@@ -345,11 +355,11 @@ class MiniFTP(threading.Thread):
         if not os.path.exists(pathname):
             return
         try:
-            if self.mode=='I':
-                file = open(pathname, 'rb')
-            else:
-                file = open(pathname, 'r')
-            # file = open(pathname, 'r')
+            # if self.mode=='I':
+            #     file = open(pathname, 'rb')
+            # else:
+            #     file = open(pathname, 'r')
+            file = open(pathname, 'r')
         except OSError as err:
             self.log('RETR', err)
 
@@ -397,24 +407,45 @@ class MiniFTP(threading.Thread):
         os.rename(self.from_filepath, to_filepath)
         self.sendCmd('250 Rename done. \r\n')
 
+
+
 def connect():
         ip_port = (HOST, PORT)
         backlog = 5
+        global socket_cmd
         socket_cmd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         socket_cmd.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1) # 减少地址复用的时间
         socket_cmd.bind(ip_port)
         socket_cmd.listen(backlog)
 
         print('Server start:', 'listening on %s, port %s'% socket_cmd.getsockname( ))
+        print('Local directory:', LOCALDIR)
 
         while True:
-            conn, addr = socket_cmd.accept() # 等待连接
+            conn, addr = socket_cmd.accept() # wait
             ftp = MiniFTP(conn, addr)
             ftp.start()
             print('Connection Built', '%s, %s'%(conn,addr))
+        # return socket_cmd
 
-        socket_cmd.close()
+def closeSock():
+    socket_cmd.close()
 
-if __name__ == "__main__":
+def start(port, localdir):
+    PORT = port
+    LOCALDIR = localdir
     server = threading.Thread(target=connect)
     server.start()
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    ## Optional parameters
+    parser.add_argument("--port", default = 21, type=int, help = "Port to listen on.")
+    parser.add_argument("--dir", default= '/Users/qinzzz/ftp', type=str, help="Directory to enter your ftp.")
+    args = parser.parse_args()
+
+    PORT = args.port
+    LOCALDIR = args.dir
+    server = threading.Thread(target=connect)
+    server.start()
+
