@@ -58,8 +58,6 @@ $ sudo python ftp_server.py (--port PORT --dir LOCALDIR)
 ## TODO
 - debug: A/I type
 On MacOS, it can only use binary(I) to upload and ascii(A) to download. Also, the file cannot contain any Chinese characters.
-- debug: non-local connection
-It seems that it cannot be connected with another PC.
 
 
 

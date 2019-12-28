@@ -3,7 +3,6 @@ import os
 import sys
 import time
 import socket
-import subprocess
 import threading
 from utils import removeDir, FtpFile
 import argparse
@@ -40,7 +39,6 @@ class MiniFTP(threading.Thread):
                 except:
                     cmd = data
                 self.log('Receive', cmd)
-                
             except socket.error as err:
                 self.log('Receive error1', err)
 
@@ -48,7 +46,6 @@ class MiniFTP(threading.Thread):
                 if not cmd:
                     break
                 else:
-                # cmd, arg = cmd[:4].strip(), cmd[4:].strip( ) or None
                     command = cmd.split()[0]
                     arg = cmd.split()[1:]
                     arg = ' '.join(arg)
@@ -92,13 +89,10 @@ class MiniFTP(threading.Thread):
             # else:
             #     self.PASV()
 
-
-    # TODO：修改明文传输密码
     '''
         Check login authority. 
         Save user information in 'auth.config' as 
             username password authority\n
-
     '''
     def loginAuth(self):
         f = open('auth.config', 'r')
@@ -118,8 +112,6 @@ class MiniFTP(threading.Thread):
     def QUIT(self, cmd):
         self.sendCmd('221 Goodbye. \r\n')
 
-
-    # TODO: add active mode.
     '''
         only support passive mode now. 
     '''
@@ -160,7 +152,6 @@ class MiniFTP(threading.Thread):
     '''
     def sendCmd(self, cmd):
         self.conn.send(cmd.encode('utf-8'))
-
 
     '''
         control data socket & send data to client
@@ -239,7 +230,7 @@ class MiniFTP(threading.Thread):
             return
         self.sendCmd('150 File list: \r\n')
         self.openDataSock()
-        if os.path.isdir(serverPath):       #   TODO: add detailed file information
+        if os.path.isdir(serverPath):  
             for file in os.listdir(serverPath):
                 try:
                     self.sendData(file+'\r\n') 
@@ -267,7 +258,7 @@ class MiniFTP(threading.Thread):
             return
         self.sendCmd('150 File list: \r\n')
         self.openDataSock()
-        if os.path.isdir(serverPath):       #   TODO: add detailed file information
+        if os.path.isdir(serverPath): 
             for file in os.listdir(serverPath):
                 try:
                     cfile = FtpFile(os.path.join(serverPath, file))
@@ -288,6 +279,9 @@ class MiniFTP(threading.Thread):
         # self.closeDataSock()
     
     def MKD(self, name):
+        if self.auth <= 1:
+            self.sendCmd('530 Make directory failed: Permission denied.\r\n')
+            return
         self.log('MKD', name)
         serverFname = os.path.join(LOCALDIR, name)
         try:
