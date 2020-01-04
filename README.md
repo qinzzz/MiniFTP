@@ -1,5 +1,5 @@
 # MiniFTP
-Project for IS301 Computer Communication and Network -- Ftp server and client
+Project for IS301 Computer Communication and Network -- Ftp server
 
 Use FTP commands standardized in [RFC 959](https://tools.ietf.org/html/rfc95) by the IETF. [This document](http://www.nsftools.com/tips/RawFTP.htm) provides a detailed introduction for FTP commands.
 

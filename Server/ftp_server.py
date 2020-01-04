@@ -251,7 +251,6 @@ class MiniFTP(threading.Thread):
         else:
             serverPath = os.path.join(self.cwd, path)
 
-        # serverPath = os.path.join(LOCALDIR, curpath)
         print(serverPath)
         if not os.path.exists(serverPath):
             self.sendCmd('550 Path name not exists.\r\n')
@@ -276,7 +275,6 @@ class MiniFTP(threading.Thread):
                     self.log('LIST error', e)
         self.closeDataSock()
         self.sendCmd('226 Transfer complete.\r\n')
-        # self.closeDataSock()
     
     def MKD(self, name):
         if self.auth <= 1:
@@ -349,11 +347,11 @@ class MiniFTP(threading.Thread):
         if not os.path.exists(pathname):
             return
         try:
-            # if self.mode=='I':
-            #     file = open(pathname, 'rb')
-            # else:
-            #     file = open(pathname, 'r')
-            file = open(pathname, 'r')
+            if self.mode=='I':
+                file = open(pathname, 'rb')
+            else:
+                file = open(pathname, 'r')
+            # file = open(pathname, 'r')
         except OSError as err:
             self.log('RETR', err)
 
